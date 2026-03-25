@@ -32,9 +32,15 @@ cd ./ChatCCP
 ### Setting up environment variables
 
 Clone the template `.env.example`, and edit the variables respectively.
-```
-DISCORD_TOKEN=discord_bot_token_here
+```env
+DIGITAL_OCEAN_ACCESS_ENDPOINT=digital_ocean_access_endpoint_here
+DIGITAL_OCEAN_ACCESS_KEY=digital_ocean_access_key_here
+
 DISCORD_APPLICATION_ID=discord_application_id_here
+DISCORD_TOKEN=discord_bot_token_here
+
+REPLY_CHAIN_MAX_DEPTH=4
+INCLUDE_REPLY_CHAIN=1
 ```
 
 ### Running the Bot

@@ -1,4 +1,4 @@
-from .logger import setup_logging
+from logger import setup_logging
 
 from discord.ext import commands
 
@@ -10,13 +10,14 @@ import sys
 import os
 
 FILE = Path(__file__).resolve()
-DIR = FILE.parent
+ROOT = FILE.parent
 
 logger = logging.getLogger(__name__)
 
 class ChatCCP(commands.Bot):
     def __init__(self):
         self.APPLICATION_ID = int(os.getenv("DISCORD_APPLICATION_ID", 0))
+        self.ROOT = ROOT
 
         if self.APPLICATION_ID == 0:
             logger.error("DISCORD_APPLICATION_ID environment variable is not set or invalid")
@@ -29,7 +30,7 @@ class ChatCCP(commands.Bot):
             help_command=None
         )
 
-    def module_from_directory(self, module: Path, directory: Path = DIR):
+    def module_from_directory(self, module: Path, directory: Path = ROOT):
         if not module.is_file():
             raise ValueError(f"{module} is not a file")
         
@@ -64,12 +65,12 @@ class ChatCCP(commands.Bot):
 
     async def setup_hook(self):
         await self.load_cogs(
-            DIR / "core",
+            ROOT / "core",
             graceful=True
         )
 
         await self.load_cogs(
-            DIR / "modules",
+            ROOT / "modules",
             graceful=True
         )
 
@@ -77,6 +78,14 @@ class ChatCCP(commands.Bot):
 
     async def on_ready(self):
         logger.info(f"Logged in as {self.user} (ID: {self.user.id})")
+
+    async def on_command_error(self, ctx: commands.Context, error: Exception):
+        # ignore unknown commands
+        # so normal chat messages do not spam errors
+        if isinstance(error, commands.CommandNotFound):
+            return
+
+        await super().on_command_error(ctx, error)
 
     def run(self):
         setup_logging()
@@ -87,6 +96,3 @@ class ChatCCP(commands.Bot):
             sys.exit()
 
         super().run(token)
-
-if __name__ == "__main__":
-    pass
