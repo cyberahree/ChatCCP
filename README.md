@@ -38,7 +38,7 @@ DISCORD_APPLICATION_ID=discord_application_id_here
 ```
 
 ### Running the Bot
-```
+```bash
 python3 ./chatccp
 ```
 

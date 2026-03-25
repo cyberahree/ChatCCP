@@ -64,7 +64,8 @@ class ChatCCP(commands.Bot):
 
     async def setup_hook(self):
         await self.load_cogs(
-            DIR / "core"
+            DIR / "core",
+            graceful=True
         )
 
         await self.load_cogs(
