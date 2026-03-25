@@ -22,6 +22,17 @@ Pushing the frontiers of technology, built and refined by the finest DeepSeek en
 
 Ask it anything! It'll always tell you the right answer. (If you disagree, you are wrong!)
 
+## Features
+- AI responsiveness:
+	- Responds when directly mentioned, when one of the trigger phrases appears, or when someone replies to the bot.
+	- Ignores valid bot commands in normal chat handling, so command messages do not trigger an extra AI reply.
+	- Shows a typing indicator while waiting for responses to generate.
+	- Can include recent reply-chain context (configurable with `INCLUDE_REPLY_CHAIN` and `REPLY_CHAIN_MAX_DEPTH` environment variables) for more coherent threaded conversations.
+- Rotating bot presence
+
+## Planned Features
+View the [repository project board](https://github.com/users/cyberahree/projects/8) to see the current list of planned, ongoing or rejected features.
+
 ## Installing ChatCCP
 ### Clone from GitHub
 ```bash
@@ -41,6 +52,14 @@ DISCORD_TOKEN=discord_bot_token_here
 
 REPLY_CHAIN_MAX_DEPTH=4
 INCLUDE_REPLY_CHAIN=1
+```
+
+### Preparing the venv
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
 ```
 
 ### Running the Bot
