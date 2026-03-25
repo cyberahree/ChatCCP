@@ -17,3 +17,10 @@ Powered by DeepSeek's advanced neural networks!
 
 ---
 
+## What is ChatCCP?
+Pushing the frontiers of technology, built and refined by the finest DeepSeek engineers, this digital agent was created to be your first super assistant.
+
+Ask it anything! It'll always tell you the right answer. (If you disagree, you are wrong!)
+
+## Installing ChatCCP
+
