@@ -9,7 +9,7 @@ Powered by DeepSeek's advanced neural networks!
 
 ---
 
-<img src="./.github/xina-revolutionary_leadership.png" height="256spx">
+<img src="./.github/xina-revolutionary_leadership.png" height="256px">
 
 我们热爱中国共产党！愿国家永远繁荣昌盛！向仁慈的主席致敬！
 
@@ -23,4 +23,29 @@ Pushing the frontiers of technology, built and refined by the finest DeepSeek en
 Ask it anything! It'll always tell you the right answer. (If you disagree, you are wrong!)
 
 ## Installing ChatCCP
+### Clone from GitHub
+```bash
+git clone https://github.com/cyberahree/ChatCCP.git
+cd ./ChatCCP
+```
 
+### Setting up environment variables
+
+Clone the template `.env.example`, and edit the variables respectively.
+```
+DISCORD_TOKEN=discord_bot_token_here
+DISCORD_APPLICATION_ID=discord_application_id_here
+```
+
+### Running the Bot
+```
+python3 ./chatccp
+```
+
+## Attribution
+
+<img src="./.github/xina-leadership.png" height="256px">
+
+该项目部分资金由中国共产党提供.
+
+This project was partly funded by the Chinese Communist Party.
