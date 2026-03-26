@@ -1,4 +1,4 @@
-from bot import ChatCCP
+from .bot import ChatCCP
 
 from dotenv import load_dotenv
 from pathlib import Path
