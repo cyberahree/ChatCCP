@@ -41,7 +41,8 @@ class Presence(commands.Cog, name="Presence"):
     
     @commands.Cog.listener()
     async def on_ready(self):
-        self.presence_task.start()
+        if not self.presence_task.is_running():
+            self.presence_task.start()
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(

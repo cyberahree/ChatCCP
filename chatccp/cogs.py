@@ -9,15 +9,13 @@ ROOT = FILE.parent
 
 logger = logging.getLogger(__name__)
 
-class Modules:
+class CogsManager:
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
         self._modules: list[str] = []
         self._core: list[str] = []
         self._loaded = False
-
-        self._load_modules()
 
     @property
     def modules(self):
@@ -31,6 +29,13 @@ class Modules:
         self._modules.clear()
         self._core.clear()
 
+        for file in (ROOT / "core").glob("*.py"):
+            if file.name == "__init__.py":
+                continue
+
+            module_name = self._module_from_directory(file)
+            self._core.append(module_name)
+
         for file in (ROOT / "modules").glob("*.py"):
             if file.name == "__init__.py":
                 continue
@@ -38,12 +43,8 @@ class Modules:
             module_name = self._module_from_directory(file)
             self._modules.append(module_name)
 
-        for file in (ROOT / "core").glob("*.py"):
-            if file.name == "__init__.py":
-                continue
-
-            module_name = self._module_from_directory(file)
-            self._core.append(module_name)
+        logger.info(f"Found {len(self._core)} core modules: {self._core}")
+        logger.info(f"Found {len(self._modules)} modules: {self._modules}")
 
     def _module_from_directory(self, module: Path):
         if not module.is_file():
@@ -64,8 +65,10 @@ class Modules:
 
         self._loaded = True
 
+        self._load_modules()
+
         for module in self._core:
-            logger.info(f"Loading core module: {module}")
+            logger.info(f"Loading module: {module}")
             await self.bot.load_extension(module)
 
         for module in self._modules:
@@ -73,7 +76,7 @@ class Modules:
             await self.bot.load_extension(module)
 
     def get_modules_by_name(self, name: str) -> list[str]:
-        name = name.strip()
+        name = name.strip().lower()
 
         if len(name) == 0:
             raise ValueError("Module name cannot be empty")
@@ -82,22 +85,27 @@ class Modules:
         # or if there's an exact match among loaded modules
         matches = []
 
-        for module in self.modules:
-            if module == name:
+        for module in self._modules:
+            module_name = module.split(".")[-1].lower()
+
+            if module_name == name:
                 return [module]
-            elif module.endswith(name):
+            elif module_name.startswith(name):
                 matches.append(module)
 
         return matches
 
-    async def reload_module(self, module: str):
+    async def reload_module(self, module: str) -> str:
         matched_modules = self.get_modules_by_name(module)
 
         if len(matched_modules) != 1:
             raise ValueError(f"Module name '{module}' is ambiguous. Matches: {matched_modules}")
-        
+
+        logger.info(f"Reloading module: {matched_modules[0]}")
+
         module_to_reload = matched_modules[0]
         await self.bot.reload_extension(module_to_reload)
+        return module_to_reload
 
     async def reload_modules(self, modules: list[str]):
         for module in modules:

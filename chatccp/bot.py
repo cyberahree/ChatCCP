@@ -1,5 +1,5 @@
 from .logger import setup_logging
-from .cogs import Modules
+from .cogs import CogsManager
 
 from discord.ext import commands
 
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class ChatCCP(commands.Bot):
     def __init__(self):
-        self.MODULES = Modules(self)
+        self.CogsManager = CogsManager(self)
 
         self.APPLICATION_ID = int(os.getenv("DISCORD_APPLICATION_ID", 0))
 
@@ -28,7 +28,7 @@ class ChatCCP(commands.Bot):
         )
 
     async def setup_hook(self):
-        await self.MODULES.init_modules()
+        await self.CogsManager.init_modules()
 
     async def on_ready(self):
         logger.info(f"Logged in as {self.user} (ID: {self.user.id})")

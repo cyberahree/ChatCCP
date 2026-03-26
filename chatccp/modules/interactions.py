@@ -1,24 +1,17 @@
 from ..inference import Inference
-from ..utilities import (
-    preprocess_message,
-    normalise
-)
+from ..utilities import normalise, preprocess_message_with_context
 
 from discord.ext import commands
 from discord import app_commands
 
 import logging
 import discord
-import re
-import os
 
 logger = logging.getLogger(__name__)
 
 class Interactions(commands.Cog, name="Interactions"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.reply_chain_max_depth = int(os.getenv("REPLY_CHAIN_MAX_DEPTH", "4"))
-        self.include_reply_chain = (os.getenv("INCLUDE_REPLY_CHAIN", "0").lower() == "1")
 
         self.inference = Inference()
         self.triggers = [
@@ -77,81 +70,35 @@ class Interactions(commands.Cog, name="Interactions"):
         has_trigger = any(trigger in normalise(message.content) for trigger in self.triggers)
         # TODO: Complete this
 
-    async def collect_message_chain(
-        self,
-        original_message: discord.Message
-    ) -> list[discord.Message]:
-        if not self.include_reply_chain:
-            return [original_message]
-
-        message_chain: list[discord.Message] = [original_message]
-        current_message = original_message
-        current_depth = 0
-
-        while (
-            current_message.reference and
-            current_message.reference.resolved and
-            current_depth < self.reply_chain_max_depth
-        ):
-            referenced_message = current_message.reference.resolved
-
-            # if discord.py didn't already resolve it to
-            # a real Message, fetch it
-            if not isinstance(referenced_message, discord.Message):
-                try:
-                    referenced_message = await current_message.channel.fetch_message(
-                        current_message.reference.message_id
-                    )
-                except discord.NotFound:
-                    break
-                except discord.Forbidden:
-                    break
-
-            # append the real message to the chain
-            message_chain.append(referenced_message)
-
-            # keep walking up the chain using the actual message
-            current_message = referenced_message
-            depth += 1
-
-        return message_chain.reverse()
-
     @app_commands.command(
         name="ask",
         description="Ask ChatCCP any question you want!"
     )
+    @app_commands.guild_only()
     @app_commands.describe(
-        query="The question you want to ask ChatCCP."
+        message="The message you want to ask ChatCCP about."
     )
-    async def ask(self, interaction: discord.Interaction, query: str):
-        # collect the message chain
-        message_chain = await self.collect_message_chain(interaction.message)
+    async def ask(
+        self,
+        interaction: discord.Interaction,
+        message: str
+    ):
+        # defer the response to give us more time to process the message
+        # and invoke inference without hitting the interaction response timeout
+        await interaction.response.defer(thinking=True)
 
-        # prepare the message list for inference
-        messages = []
+        # process the message by resolving mentions to their display names
+        processed_message = await preprocess_message_with_context(
+            message, interaction.guild
+        )
 
-        for message in message_chain:
-            messages.append({
-                "role": "user" if message.author != self.bot.user else "assistant",
-                "content": await preprocess_message(message)
-            })
+        # invoke inference with the processed message and send the response back to the user
+        response = await self.inference.invoke(processed_message)
 
-        # start the typing indicator
-        # while we wait for inference
-        # to complete
-        await interaction.channel.typing()
+        # prepend the user's original message to the response for context
+        reply = f"-# {interaction.user.mention}:\n{message}\n\n-# {self.bot.user.mention}:\n{response}"
 
-        # send the query and filter
-        # before replying to the user
-        response = await self.inference.invoke(messages)
-
-        response = re.sub(
-            r"<think>.*?</think>", "",
-            response,
-            flags=re.DOTALL
-        ).strip()
-
-        await interaction.response.send_message(response)
+        await interaction.followup.send(reply)
 
 async def setup(Bot: commands.Bot):
     await Bot.add_cog(
