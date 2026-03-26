@@ -1,10 +1,11 @@
-from inference import (
-    Inference,
-    normalize
+from ..inference import Inference
+from ..utilities import (
+    preprocess_message,
+    normalise
 )
 
-from dataclasses import dataclass
 from discord.ext import commands
+from discord import app_commands
 
 import logging
 import discord
@@ -13,22 +14,10 @@ import os
 
 logger = logging.getLogger(__name__)
 
-@dataclass
-class ReplyChain:
-    first_author: discord.User
-    messages: list[str]
-
-@dataclass
-class MessageAttributes:
-    has_trigger: bool
-    is_mentioned: bool
-    is_reply_to_bot: bool
-    reply_chain: ReplyChain = None
-
 class Interactions(commands.Cog, name="Interactions"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.reply_chain_max_depth = int(os.getenv("REPLY_CHAIN_MAX_DEPTH", 4))
+        self.reply_chain_max_depth = int(os.getenv("REPLY_CHAIN_MAX_DEPTH", "4"))
         self.include_reply_chain = (os.getenv("INCLUDE_REPLY_CHAIN", "0").lower() == "1")
 
         self.inference = Inference()
@@ -73,19 +62,37 @@ class Interactions(commands.Cog, name="Interactions"):
             "social credits"
         ]
 
-    async def get_reply_chain(self, message: discord.Message) -> ReplyChain:
-        reply_chain: list[discord.Message] = []
-        depth = 0
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        if message.author.bot:
+            return
 
-        current_message = message
+        # let command handling own command messages
+        # without invoking inference
+        context = await self.bot.get_context(message)
 
+        if context.valid:
+            return
+
+        has_trigger = any(trigger in normalise(message.content) for trigger in self.triggers)
+        # TODO: Complete this
+
+    async def collect_message_chain(
+        self,
+        original_message: discord.Message
+    ) -> list[discord.Message]:
         if not self.include_reply_chain:
-            return ReplyChain(
-                first_author=current_message.author,
-                messages=[]
-            )
+            return [original_message]
 
-        while current_message.reference and current_message.reference.message_id and depth < self.reply_chain_max_depth:
+        message_chain: list[discord.Message] = [original_message]
+        current_message = original_message
+        current_depth = 0
+
+        while (
+            current_message.reference and
+            current_message.reference.resolved and
+            current_depth < self.reply_chain_max_depth
+        ):
             referenced_message = current_message.reference.resolved
 
             # if discord.py didn't already resolve it to
@@ -100,109 +107,51 @@ class Interactions(commands.Cog, name="Interactions"):
                 except discord.Forbidden:
                     break
 
-            processed = await self.preprocess_message(referenced_message)
-            reply_chain.append(processed)
+            # append the real message to the chain
+            message_chain.append(referenced_message)
 
             # keep walking up the chain using the actual message
             current_message = referenced_message
             depth += 1
 
-        reply_chain.reverse()
+        return message_chain.reverse()
 
-        return ReplyChain(
-            first_author=current_message.author,
-            messages=reply_chain
-        )
+    @app_commands.command(
+        name="ask",
+        description="Ask ChatCCP any question you want!"
+    )
+    @app_commands.describe(
+        query="The question you want to ask ChatCCP."
+    )
+    async def ask(self, interaction: discord.Interaction, query: str):
+        # collect the message chain
+        message_chain = await self.collect_message_chain(interaction.message)
 
-    async def get_message_attributes(self, message: discord.Message) -> MessageAttributes:
-        is_reply_to_bot = (
-            message.reference and
-            message.reference.resolved and
-            message.reference.resolved.author == self.bot.user
-        )
-
-        reply_chain = await self.get_reply_chain(message) if is_reply_to_bot else []
-
-        return MessageAttributes(
-            has_trigger=any(trigger in normalize(message.content) for trigger in self.triggers),
-            is_mentioned=self.bot.user.mentioned_in(message),
-            is_reply_to_bot=is_reply_to_bot,
-            reply_chain=reply_chain
-        )
-
-    async def preprocess_message(self, message: discord.Message) -> str:
-        # replace user mentions (and channel mentions) with their respective 
-        # names, so that the model can understand them better
-        content = normalize(message.content)
-
-        for user in message.mentions:
-            content = content.replace(f"<@{user.id}>", f"<@{user.id}> ({user.name})")
-
-        for channel in message.channel_mentions:
-            content = content.replace(f"<#{channel.id}>", f"<#{channel.id}> ({channel.name})")
-
-        return f"<@{message.author.id}> ({message.author.name}): {content}"
-
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        if message.author.bot:
-            return
-
-        # let command handling own command messages
-        # without invoking inference
-        context = await self.bot.get_context(message)
-
-        if context.valid:
-            return
-
-        # collect message attributes, such as
-        # whether it contains triggers,
-        # mentions the bot,
-        # or is a reply to the bot        
-        message_attributes = await self.get_message_attributes(message)
-        should_respond = (
-            message_attributes.has_trigger or
-            message_attributes.is_mentioned or
-            message_attributes.is_reply_to_bot
-        )
-
-        # if none of the conditions for responding are met, ignore the message
-        if not should_respond:
-            return
-
-        # build a timeline, starting with the reply chain if the message is a reply to the bot
-        # otherwise just use the current message as the timeline
-        # this is an overt use of tokens, increasing context
-        first_author = message.author
-        timeline = []
-
-        try:
-            if message_attributes.is_reply_to_bot and self.include_reply_chain:
-                first_author = message_attributes.reply_chain.first_author
-                timeline = message_attributes.reply_chain.messages
-        except Exception as e:
-            # if anything goes wrong with fetching the reply chain, just ignore it and use the current message
-            logger.error(f"Error fetching reply chain: {e}")
-
-        timeline.append(await self.preprocess_message(message))
-
-        # restructure so it works with the api
+        # prepare the message list for inference
         messages = []
-        is_user = (first_author != self.bot.user)
-        
-        for timeline_message in timeline:
+
+        for message in message_chain:
             messages.append({
-                "role": "user" if is_user else "assistant",
-                "content": timeline_message
+                "role": "user" if message.author != self.bot.user else "assistant",
+                "content": await preprocess_message(message)
             })
 
-            is_user = not is_user
+        # start the typing indicator
+        # while we wait for inference
+        # to complete
+        await interaction.channel.typing()
 
-        async with message.channel.typing():
-            response = await self.inference.invoke(messages)
-            response = re.sub(r"<think>.*?</think>", "", response, flags=re.DOTALL).strip()
+        # send the query and filter
+        # before replying to the user
+        response = await self.inference.invoke(messages)
 
-        await message.reply(response)
+        response = re.sub(
+            r"<think>.*?</think>", "",
+            response,
+            flags=re.DOTALL
+        ).strip()
+
+        await interaction.response.send_message(response)
 
 async def setup(Bot: commands.Bot):
     await Bot.add_cog(

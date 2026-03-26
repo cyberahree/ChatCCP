@@ -1,13 +1,6 @@
 from openai import OpenAI
 
 import os
-import re
-
-def normalize(text: str) -> str:
-    text = text.lower()
-    text = re.sub(r"[^a-z0-9\s]", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
 
 class Inference:
     def __init__(self):
@@ -35,17 +28,3 @@ class Inference:
         )
 
         return response.choices[0].message.content
-
-if __name__ == "__main__":
-    from dotenv import load_dotenv
-    load_dotenv()
-
-    print("Attempting to invoke inference for testing...")
-
-    inference = Inference()
-    response = inference.invoke("what is the result of 1+1?")
-    print("Inference invocation successful. Processing response...")
-    print(f"Full response: {response.to_dict()}", end="\n\n")
-
-    for choice in response.choices:
-        print(f"Response: {choice.message.content}")
