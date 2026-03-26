@@ -23,11 +23,9 @@ Pushing the frontiers of technology, built and refined by the finest DeepSeek en
 Ask it anything! It'll always tell you the right answer. (If you disagree, you are wrong!)
 
 ## Features
-- AI responsiveness:
-	- Responds when directly mentioned, when one of the trigger phrases appears, or when someone replies to the bot.
-	- Ignores valid bot commands in normal chat handling, so command messages do not trigger an extra AI reply.
-	- Shows a typing indicator while waiting for responses to generate.
-	- Can include recent reply-chain context (configurable with `INCLUDE_REPLY_CHAIN` and `REPLY_CHAIN_MAX_DEPTH` environment variables) for more coherent threaded conversations.
+- AI interactivity:
+	- Respond to a user's query when sent a message through the `/ask` slash command
+	- Maintains the context of x previous responses
 - Rotating bot presence
 
 ## Planned Features
